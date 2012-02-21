@@ -81,4 +81,31 @@ Fields in Edition records:
 	accompanying_material (string):
 	collections (object[]):
 	location (string[]):
+
+Fields in Work records:
+	key (string):
+	type (object(key:work)):
+	title (string):
+	subtitle (string):
+	translated_titles (string[]):
+	other_titles (string[]):
+	authors (object[]):
+	created (object):
+	last_modified (object):
+	latest_revision (int):
+	revision (int):
+	covers (int[]):
+	cover_edition (object):
+	subject_places (string[]):
+	subject_people (string[]):
+	subject_times (string[]):
+	subjects (string[]):
+	description (text):
+	notes (object(type:text, value:string)):
+	first_sentence (text):
+	dewey_number (string[]):
+	lc_classifications (string[]):
+	original_languages (object[]):
+	links (object(type:object(key:link),url:string,title:string)[]):
+	first_publish_date (string[]):
 	
