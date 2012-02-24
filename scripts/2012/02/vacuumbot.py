@@ -1,5 +1,15 @@
 #!/usr/bin/env python
 
+"""VacuumBot, based on a script by another Ben
+  https://github.com/internetarchive/openlibrary/blob/master/scripts/2010/04/import_goodreads_ids.py
+  
+  Provides tools to remove given keys from OL records, to de-duplicate values
+  from a given key and to move values from one key to another. 
+  Other purposes may be built in later.
+  
+  This is a work in progress.
+  """
+
 from time import localtime, sleep, strftime
 from olapi import OpenLibrary
 

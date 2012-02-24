@@ -51,6 +51,7 @@ Fields in Edition records:
 	subtitle (string):
 	edition_name (string):
 	other_titles (string[]):
+	work_titles (string[]):
 	series (string[]):
 	number_of_pages (int):
 	pagination (string):
@@ -77,7 +78,7 @@ Fields in Edition records:
 	uris (string[]):
 	uri_descriptions (string[]):
 	volumes (object[]):
-	ia_box_id (string[])
+	ia_box_id (string[]):
 	accompanying_material (string):
 	collections (object[]):
 	location (string[]):
