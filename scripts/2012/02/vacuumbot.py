@@ -54,7 +54,7 @@ def remove_key(olid, key):
     del object[key]
 	ol.save(object['key'], object, "Sucked up \"" + key + "\".")
   
-def remove_superfluous_values(olid, key):
+def deduplicate_values(olid, key):
   """Removes duplicate values
   
   Reads the values of a key and removes duplicate values,
