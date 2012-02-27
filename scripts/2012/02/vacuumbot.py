@@ -44,6 +44,8 @@ def map_id(olid, isbn, goodreads_id):
   print_log("Adding Goodreads ID \"" + goodreads_id + "\" to Openlibrary ID \"" + olid + "\"")
   set_goodreads_id(olid, goodreads_id)
 
+def 
+
 def remove_key(olid, key):
   """Removes a key from a record
   
@@ -54,6 +56,17 @@ def remove_key(olid, key):
     del object[key]
 	ol.save(object['key'], object, "Sucked up \"" + key + "\".")
   
+def deduplicate_list(li):
+  a = len(li)
+  c = 0
+  li.sort()
+  while c < a-1:
+    if li[c] == li[c+1]:
+      li.pop(c+1)
+      a = a-1
+    else:
+      c = c+1
+  
 def deduplicate_values(olid, key):
   """Removes duplicate values
   
@@ -62,7 +75,8 @@ def deduplicate_values(olid, key):
   """
   object = ol.get(olid)
   if key in object:
-    
+    if isinstance(object[key], list):
+	  deduplicate_list(object[key]) 
 
 def load(filename):
   n = 0
