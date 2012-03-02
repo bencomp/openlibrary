@@ -44,7 +44,35 @@ def map_id(olid, isbn, goodreads_id):
   print_log("Adding Goodreads ID \"" + goodreads_id + "\" to Openlibrary ID \"" + olid + "\"")
   set_goodreads_id(olid, goodreads_id)
 
-def 
+def deduplicate_list(li):
+  """Sorts a list and removes duplicate values in place.
+  """
+  a = len(li)
+  c = 0
+  li.sort()
+  while c < a-1:
+    if li[c] == li[c+1]:
+      li.pop(c+1)
+      a = a-1
+    else:
+      c = c+1
+  
+def dedup(obj):
+  """Removes duplicate values from an object.
+  
+  Calls deduplicate_list for lists.
+  Calls itself on compound objects.
+  Does nothing with strings or other types.
+  """
+  if isinstance(obj, str):
+	return
+  elif isinstance(obj, dict):
+    for k in obj:
+	  dedup(obj[k])
+  elif isinstance(obj, list):
+    deduplicate_list(obj) 
+  else:
+    return
 
 def remove_key(olid, key):
   """Removes a key from a record
@@ -56,17 +84,7 @@ def remove_key(olid, key):
     del object[key]
 	ol.save(object['key'], object, "Sucked up \"" + key + "\".")
   
-def deduplicate_list(li):
-  a = len(li)
-  c = 0
-  li.sort()
-  while c < a-1:
-    if li[c] == li[c+1]:
-      li.pop(c+1)
-      a = a-1
-    else:
-      c = c+1
-  
+
 def deduplicate_values(olid, key):
   """Removes duplicate values
   
@@ -75,10 +93,33 @@ def deduplicate_values(olid, key):
   """
   object = ol.get(olid)
   if key in object:
-    if isinstance(object[key], list):
-	  deduplicate_list(object[key]) 
+    dedup(object[key])
 
-def load(filename):
+def remove_classification(obj, classification):
+  if "classifications" in obj:
+    if classification in obj["classifications"]:
+      del obj["classifications"][classification]
+
+def clean_lccn_permalink(olid):
+  """Removes lccn_permalink from classifications
+  
+  Removes permalink from classifications and adds the LCCN to
+  the identifiers, if is isn't there already.
+  """
+  object = ol.get(olid)
+  if "classifications" in object:
+    if "lccn_permalink" in object["classifications"]:
+      if "identifiers" in object:
+	    if "lccn" in object["identifiers"]:
+	  lccn = 
+	  remove_classification(object, "lccn_permalink")
+  
+
+def vacuum(filename):
+  """Main execution
+  
+  Vacuums the Open Library based on commands found in the file.
+  """
   n = 0
   for line in open(filename):
     olid, isbn, goodreads_id = line.strip().split()
@@ -96,4 +137,4 @@ def load(filename):
 
 if __name__ == "__main__":
   import sys
-  load(sys.argv[1])
+  vacuum(sys.argv[1])
