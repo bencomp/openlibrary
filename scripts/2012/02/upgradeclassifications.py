@@ -23,14 +23,14 @@ def upgrade_classifications(olid):
   # Read the dicts from the classifications list:
   for k in record["classifications"]:
     if k["name"] in tl_classifications:
-	  if k["name"] in record.keys():
-	    record[k["name"]].append(k["value"])
+      if k["name"] in record.keys():
+        record[k["name"]].append(k["value"])
       else:
-	    record[k["name"]] = [k["value"]]
-	elif k["name"] not in c.keys():
-	  c["name"] = [k["value"]]
-	else:
-	  c["name"].append(k["value"])
+        record[k["name"]] = [k["value"]]
+    elif k["name"] not in c.keys():
+      c["name"] = [k["value"]]
+    else:
+      c["name"].append(k["value"])
   
   # If the dict is empty, there were only top level classifications
   if len(c) > 0:
@@ -43,7 +43,7 @@ def upgrade_classifications(olid):
 def load(file):
   for line in open(file):
     olid, reason = line.strip().split()
-	upgrade_classifications(olid)
+    upgrade_classifications(olid)
 
 if __name__ == "__main__":
   import sys
