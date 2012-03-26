@@ -51,7 +51,7 @@ $def with (book)
         $if contributors:
             <bibo:contributorList rdf:parseType="Collection">
             $for c in contributors:
-                 <foaf:Person><foaf:name>$c.name</foaf:name></foaf:Person>
+                 <foaf:Agent><foaf:name>$c.name</foaf:name></foaf:Agent>
             </bibo:contributorList>
         $:display("dcterms:contributor", book.contributions)
         <!-- bibliographic description -->
@@ -92,6 +92,8 @@ $def with (book)
     </rdf:Description>
         <!-- administrative -->
     <rdf:Description rdf:about="">
-        $:display("dcterms:modified", book.last_modified)
+        <dcterms:modified rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">$book.last_modified.isoformat()</dcterms:modified>
+        <dcterms:created rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">$book.created.isoformat()</dcterms:created>
+        <ov:versionnumber>$book.revision</ov:versionnumber>
     </rdf:Description>
 </rdf:RDF>

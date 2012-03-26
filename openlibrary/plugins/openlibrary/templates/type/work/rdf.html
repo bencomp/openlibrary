@@ -85,8 +85,8 @@ $def with (work)
     
     <!-- administrative -->
     <rdf:Description rdf:about="">
-        <dcterms:modified rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">$work.last_modified</dcterms:modified>
-        <dcterms:created rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">$work.created</dcterms:created>
+        <dcterms:modified rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">$work.last_modified.isoformat()</dcterms:modified>
+        <dcterms:created rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">$work.created.isoformat()</dcterms:created>
         <ov:versionnumber>$work.revision</ov:versionnumber>
     </rdf:Description>
 
