@@ -16,8 +16,6 @@ $def with (author)
         $ name = author.name
 
     $ auri = "http://openlibrary.org" + author.key
-    $ auAbout = "http://openlibrary.org" + author.key + "/about/"
-
 
     $def display(tag, value):
         $if isinstance(value, list):
@@ -65,8 +63,8 @@ $def with (author)
     $elif author.entity_type = "org":
         <foaf:Organization rdf:about="$auri">
         $:display("foaf:name", name)
-        $:display("rdg2:variantNameForThePerson", author.alternate_names)
-        $:display("rdg2:biographicalInformation", author.bio)
+        $:display("rdg2:variantNameForTheCorporateBody", author.alternate_names)
+        $:display("dcterms:description", author.bio)
         $if author.wikipedia:
             <foaf:isPrimaryTopicOf>
                 <foaf:Document rdf:about="$author.wikipedia">
@@ -88,9 +86,9 @@ $def with (author)
     $else:
         <foaf:Agent rdf:about="$auri">
         $:display("foaf:name", name)
-        $:display("rdg2:variantNameForThePerson", author.alternate_names)
-        $:display("rdg2:biographicalInformation", author.bio)
-        $:display("rdg2:titleOfThePerson", author.title)
+        $:display("foaf:name", author.alternate_names)
+        $:display("dcterms:description", author.bio)
+        $:display("foaf:title", author.title)
         $if author.birth_date:
             <bio:event>
                 <bio:Birth>
