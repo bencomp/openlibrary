@@ -26,48 +26,101 @@ $def with (author)
         $elif value:
             <$tag>$value</$tag>
             
-
-    <foaf:Agent rdf:about="$auri">
+    $if author.entity_type = "person":
+        <foaf:Person rdf:about="$auri">
         $:display("foaf:name", name)
         $:display("rdg2:variantNameForThePerson", author.alternate_names)
         $:display("rdg2:biographicalInformation", author.bio)
         $:display("rdg2:titleOfThePerson", author.title)
-
-      $if author.birth_date:
-        <bio:event>
-            <bio:Birth>
-                 <dcterms:date>$author.birth_date</dcterms:date>
-            </bio:Birth>
-        </bio:event>
-
-      $if author.death_date:
-        <bio:event>
-            <bio:Death>
-                <dcterms:date>$author.death_date</dcterms:date>
-            </bio:Death>
-        </bio:event> 
-
-
+        $if author.birth_date:
+            <bio:event>
+                <bio:Birth>
+                     <dcterms:date>$author.birth_date</dcterms:date>
+                </bio:Birth>
+            </bio:event>
+        $if author.death_date:
+            <bio:event>
+                <bio:Death>
+                    <dcterms:date>$author.death_date</dcterms:date>
+                </bio:Death>
+            </bio:event> 
         $if author.wikipedia:
             <foaf:isPrimaryTopicOf>
                 <foaf:Document rdf:about="$author.wikipedia">
                     <rdfs:label>Wikipedia</rdfs:label>
                 </foaf:Document>
             </foaf:isPrimaryTopicOf>
-
         $for link in author.links:
             <foaf:page>
                 <foaf:Document rdf:about="$link.url">
                     <rdfs:label>$link.title</rdfs:label>
                 </foaf:Document>
             </foaf:page>
-        
         $for photo in author.photos:    
             $ auphoto = "http://covers.openlibrary.org/b/id/" + str(photo) + "-M.jpg"
             <foaf:depiction>
-            <foaf:Image rdf:about="$auphoto" /></foaf:depiction>
-
-    </foaf:Agent>
+                <foaf:Image rdf:about="$auphoto" />
+            </foaf:depiction>
+        </foaf:Person>
+    $elif author.entity_type = "org":
+        <foaf:Organization rdf:about="$auri">
+        $:display("foaf:name", name)
+        $:display("rdg2:variantNameForThePerson", author.alternate_names)
+        $:display("rdg2:biographicalInformation", author.bio)
+        $if author.wikipedia:
+            <foaf:isPrimaryTopicOf>
+                <foaf:Document rdf:about="$author.wikipedia">
+                    <rdfs:label>Wikipedia</rdfs:label>
+                </foaf:Document>
+            </foaf:isPrimaryTopicOf>
+        $for link in author.links:
+            <foaf:page>
+                <foaf:Document rdf:about="$link.url">
+                    <rdfs:label>$link.title</rdfs:label>
+                </foaf:Document>
+            </foaf:page>
+        $for photo in author.photos:    
+            $ auphoto = "http://covers.openlibrary.org/b/id/" + str(photo) + "-M.jpg"
+            <foaf:depiction>
+                <foaf:Image rdf:about="$auphoto" />
+            </foaf:depiction>
+        </foaf:Organization>
+    $else:
+        <foaf:Agent rdf:about="$auri">
+        $:display("foaf:name", name)
+        $:display("rdg2:variantNameForThePerson", author.alternate_names)
+        $:display("rdg2:biographicalInformation", author.bio)
+        $:display("rdg2:titleOfThePerson", author.title)
+        $if author.birth_date:
+            <bio:event>
+                <bio:Birth>
+                     <dcterms:date>$author.birth_date</dcterms:date>
+                </bio:Birth>
+            </bio:event>
+        $if author.death_date:
+            <bio:event>
+                <bio:Death>
+                    <dcterms:date>$author.death_date</dcterms:date>
+                </bio:Death>
+            </bio:event> 
+        $if author.wikipedia:
+            <foaf:isPrimaryTopicOf>
+                <foaf:Document rdf:about="$author.wikipedia">
+                    <rdfs:label>Wikipedia</rdfs:label>
+                </foaf:Document>
+            </foaf:isPrimaryTopicOf>
+        $for link in author.links:
+            <foaf:page>
+                <foaf:Document rdf:about="$link.url">
+                    <rdfs:label>$link.title</rdfs:label>
+                </foaf:Document>
+            </foaf:page>
+        $for photo in author.photos:    
+            $ auphoto = "http://covers.openlibrary.org/b/id/" + str(photo) + "-M.jpg"
+            <foaf:depiction>
+                <foaf:Image rdf:about="$auphoto" />
+            </foaf:depiction>
+        </foaf:Agent>
 
     <!-- administrative -->
     <rdf:Description rdf:about="">

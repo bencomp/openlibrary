@@ -14,7 +14,7 @@ $def with (book)
   xmlns:foaf='http://xmlns.com/foaf/0.1/'
 >
     $if book.subtitle:
-        $ title = book.title + " " + book.subtitle
+        $ title = book.title + ": " + book.subtitle
     $else:
         $ title = book.title
 
