@@ -93,11 +93,15 @@ class OpenLibrary:
             self.cookie =  ';'.join([c.split(';')[0] for c in cookies])
 
     def get(self, key, v=None):
+        """Get a record with optional version.
+        """
         data = self._request(key + '.json' + ('?v=%d' % v if v else '')).read()
         return unmarshal(simplejson.loads(data))
         
     def get_many(self, keys):
         """Get multiple documents in a single request as a dictionary.
+        
+        The dictionary's keys are the records' keys.
         """
         if len(keys) > 500:
             # get in chunks of 500 to avoid crossing the URL length limit.
@@ -113,6 +117,8 @@ class OpenLibrary:
         return simplejson.loads(response.read())['result']
 
     def save(self, key, data, comment=None):
+        """Save a single record.
+        """
         headers = {'Content-Type': 'application/json'}
         data = marshal(data)
         if comment:
@@ -137,6 +143,13 @@ class OpenLibrary:
         return simplejson.loads(response.read())
 
     def save_many(self, query, comment=None, action=None):
+        """Save multiple records at once.
+        
+        The query argument must be a list of records, the comment is the comment saved
+        in the mass-update and action is something like "merge-author" but almost always empty.
+        
+        Suggested maximum number of records to save per call is 100.
+        """
         return self._call_write('save_many', query, comment, action)
         
     def write(self, query, comment="", action=""):
