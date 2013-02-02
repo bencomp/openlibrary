@@ -199,7 +199,7 @@ class OpenLibrary:
 
 
 def marshal(data):
-    """Serializes the specified data in the format required by OL. ::
+    """Serializes the specified data to the format required by OL. ::
 
         >>> marshal(datetime.datetime(2009, 1, 2, 3, 4, 5, 6789))
         {'type': '/type/datetime', 'value': '2009-01-02T03:04:05.006789'}
@@ -245,7 +245,7 @@ def unmarshal(d):
 
 
 def parse_datetime(value):
-    """Parses ISO datetime formatted string. ::
+    """Parses an ISO datetime formatted string. ::
 
         >>> parse_datetime("2009-01-02T03:04:05.006789")
         datetime.datetime(2009, 1, 2, 3, 4, 5, 6789)
