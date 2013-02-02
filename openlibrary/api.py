@@ -93,7 +93,7 @@ class OpenLibrary:
             self.cookie =  ';'.join([c.split(';')[0] for c in cookies])
 
     def get(self, key, v=None):
-        """Get a record with optional version.
+        """Get a record, optionally a specific version.
         """
         data = self._request(key + '.json' + ('?v=%d' % v if v else '')).read()
         return unmarshal(simplejson.loads(data))
@@ -165,8 +165,8 @@ class OpenLibrary:
         Open Library always limits the result to 1000 items due to
         performance issues. Pass limit=False to fetch all matching
         results by making multiple requests to the server. Please note
-        the an iterator is returned insted of list when limit=False is
-        passed.::
+        an iterator is returned instead of a list when limit=False is
+        passed. ::
 
             >>> ol.query({'type': '/type/type', 'limit': 2}) #doctest: +SKIP
             [{'key': '/type/property'}, {'key': '/type/type'}]
@@ -199,7 +199,7 @@ class OpenLibrary:
 
 
 def marshal(data):
-    """Serializes the specified data in the format required by OL.::
+    """Serializes the specified data in the format required by OL. ::
 
         >>> marshal(datetime.datetime(2009, 1, 2, 3, 4, 5, 6789))
         {'type': '/type/datetime', 'value': '2009-01-02T03:04:05.006789'}
@@ -219,7 +219,7 @@ def marshal(data):
 
 
 def unmarshal(d):
-    u"""Converts OL serialized objects to python.::
+    u"""Converts OL serialized objects to python. ::
 
         >>> unmarshal({"type": "/type/text", "value": "hello, world"})
         <text: u'hello, world'>
@@ -245,7 +245,7 @@ def unmarshal(d):
 
 
 def parse_datetime(value):
-    """Parses ISO datetime formatted string.::
+    """Parses ISO datetime formatted string. ::
 
         >>> parse_datetime("2009-01-02T03:04:05.006789")
         datetime.datetime(2009, 1, 2, 3, 4, 5, 6789)
