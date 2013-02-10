@@ -83,12 +83,12 @@ $def display_goodreads(label, ids):
         </table>
 
 $def display_contributor(c):
-    <li><span>$c.role</span><br />$c.name </li>
+    <li property="contributor" typeof="http://xmlns.com/foaf/0.1/Agent"><span>$c.role</span><br /><span property="name">$c.name </span></li>
 
 $ work = page.works and page.works[0] or None
 
 
-<div id="contentHead" resource="#edition">
+<div id="contentHead" vocab="http://schema.org/" typeof="Book" resource="#edition">
     <table width="100%"><tbody><tr>
 
     <td valign="top" style="padding-right:10px;">
