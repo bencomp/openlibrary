@@ -88,7 +88,7 @@ $def display_contributor(c):
 $ work = page.works and page.works[0] or None
 
 
-<div id="contentHead">
+<div id="contentHead" resource="#edition">
     <table width="100%"><tbody><tr>
 
     <td valign="top" style="padding-right:10px;">
@@ -118,7 +118,7 @@ $ work = page.works and page.works[0] or None
             <strong>$:_('1 edition')</strong> record for of $page.title
         $ authors = cond(work, work and work.get_authors(), page.get_authors())
         $if authors:
-            $ author_list = ', '.join('<a href="%s">%s</a>' % (a.url(), truncate(a.name, 40)) for a in authors)
+            $ author_list = ', '.join('<span property="author" typeof="Person"><a href="%s" property="url"><span property="name">%s</span></a></span>' % (a.url(), truncate(a.name, 40)) for a in authors)
             $_("by") <span title="$_('Go to this author\'s page')">$:author_list</span>
         $else:
             $:_("by an <em>unknown author</em>")
@@ -143,7 +143,7 @@ $ work = page.works and page.works[0] or None
 
 <div id="contentBody">
 
-    <div class="workDetails">
+    <div class="workDetails" vocab="http://schema.org/" typeof="Book" resource="#edition">
 
         <div class="editionCover">
 
