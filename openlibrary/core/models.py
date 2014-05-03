@@ -17,7 +17,15 @@ from openlibrary import accounts
 
 # relative imports
 from lists.model import ListMixin, Seed
-from . import cache, iprange, inlibrary
+from . import cache, iprange, inlibrary, waitinglist
+
+def _get_ol_base_url():
+    # Anand Oct 2013
+    # Looks like the default value when called from script
+    if "[unknown]" in web.ctx.home:
+        return "https://openlibrary.org"
+    else:
+        return web.ctx.home
 
 class Image:
     def __init__(self, site, category, id):
@@ -27,6 +35,8 @@ class Image:
         
     def info(self):
         url = '%s/%s/id/%s.json' % (h.get_coverstore_url(), self.category, self.id)
+        if url.startswith("//"):
+            url = "http:" + url
         try:
             d = simplejson.loads(urllib2.urlopen(url).read())
             d['created'] = h.parse_datetime(d['created'])
@@ -112,7 +122,7 @@ class Thing(client.Thing):
         # preload them
         self._site.get_many(list(authors))
         
-    def _make_url(self, label, suffix, **params):
+    def _make_url(self, label, suffix, relative=True, **params):
         """Make url of the form $key/$label$suffix?$params.
         """
         if label is not None:
@@ -121,6 +131,8 @@ class Thing(client.Thing):
             u = self.key + suffix
         if params:
             u += '?' + urllib.urlencode(params)
+        if not relative:
+            u = _get_ol_base_url() + u            
         return u
 
     def get_url(self, suffix="", **params):
@@ -245,11 +257,110 @@ class Edition(Thing):
     def get_ia_collections(self):
         return self.get_ia_meta_fields().get("collection", [])
 
+    def is_access_restricted(self):
+        collections = self.get_ia_collections()
+        return ('printdisabled' in collections
+                or 'lendinglibrary' in collections
+                or self.get_ia_meta_fields().get("access-restricted") is True)
+
     def can_borrow(self):
         collections = self.get_ia_collections()
         return (
             'lendinglibrary' in collections or
             ('inlibrary' in collections and inlibrary.get_library() is not None))
+
+    def get_waitinglist(self):
+        """Returns list of records for all users currently waiting for this book."""
+        return waitinglist.get_waitinglist_for_book(self.key)
+
+    def get_waitinglist_size(self):
+        """Returns the number of people on waiting list to borrow this book.
+        """
+        return waitinglist.get_waitinglist_size(self.key)
+
+    def get_waitinglist_position(self, user):
+        """Returns the position of this user in the waiting list."""
+        return waitinglist.get_waitinglist_position(user.key, self.key)
+
+    def get_scanning_contributor(self):
+        return self.get_ia_meta_fields().get("contributor")
+
+    def get_loans(self):
+        from ..plugins.upstream import borrow
+        return borrow.get_edition_loans(self)
+
+    def get_ebook_status(self):
+        """
+            None
+            "read-online"
+            "borrow-available"
+            "borrow-checkedout"
+            "borrow-user-checkedout"
+            "borrow-user-waiting"
+            "protected"
+        """
+        if self.get("ocaid"):
+            if not self.is_access_restricted():
+                return "read-online"
+            if not self.is_lendable_book():
+                return "protected"
+
+            if self.get_available_loans():
+                return "borrow-available"
+
+            user = web.ctx.site.get_user()
+            if not user:
+                return "borrow-checkedout"
+
+            checkedout_by_user = any(loan.get('user') == user.key for loan in self.get_current_loans())
+            if checkedout_by_user:
+                return "borrow-user-checkedout"
+            if user.is_waiting_for(self):
+                return "borrow-user-waiting"
+            else:
+                return "borrow-checkedout"
+
+    def is_lendable_book(self):
+        """Returns True if the book is lendable.
+        """
+        return self.can_borrow()
+
+    def get_ia_download_link(self, suffix):
+        """Returns IA download link for given suffix.
+        The suffix is usually one of '.pdf', '.epub', ''.djvu', '.mobi', '_djvu.txt'
+        """
+        if self.ocaid:
+            metadata = self.get_ia_meta_fields()
+            # The _filenames field is set by ia.get_metadata function
+            filenames = metadata.get("_filenames")
+            if filenames:
+                filename = some(f for f in filenames if f.endswith(suffix))
+            else:
+                # filenames is not in cache. 
+                # This is required only until all the memcache entries expire
+                filename = self.ocaid + suffix
+
+            if filename is None and self.is_ia_scan():                
+                # IA scans will have all the required suffixes. 
+                # Sometimes they are generated on the fly. 
+                filename = self.ocaid + suffix
+
+            if filename:
+                return "https://archive.org/download/%s/%s" % (self.ocaid, filename)
+
+    def is_ia_scan(self):
+        metadata = self.get_ia_meta_fields()
+        # all IA scans will have scanningcenter field set
+        return bool(metadata.get("scanningcenter"))
+
+def some(values):
+    """Returns the first value that is True from the values iterator.
+    Works like any, but returns the value instead of bool(value).
+    Returns None if none of the values is True.
+    """
+    for v in values:
+        if v:
+            return v
 
 
 class Work(Thing):
@@ -294,6 +405,28 @@ class Work(Thing):
             "e": self.edition_count
         }
 
+    def _make_subject_link(self, title, prefix=""):
+        slug = web.safestr(title.lower().replace(' ', '_').replace(',',''))
+        key = "/subjects/%s%s" % (prefix, slug)
+        return web.storage(key=key, title=title, slug=slug)
+
+    def get_subject_links(self, type="subject"):
+        """Returns all the subjects as link objects.         
+        Each link is a web.storage object with title and key fields.
+
+        The type should be one of subject, place, person or time.
+        """
+        if type == 'subject':
+            return [self._make_subject_link(s) for s in self.get_subjects()]
+        elif type == 'place':
+            return [self._make_subject_link(s, "place:") for s in self.subject_places]
+        elif type == 'person':
+            return [self._make_subject_link(s, "person:") for s in self.subject_people]
+        elif type == 'time':
+            return [self._make_subject_link(s, "time:") for s in self.subject_times]
+        else:
+            return []
+
 class Author(Thing):
     """Class to represent /type/author objects in OL.
     """
@@ -301,7 +434,7 @@ class Author(Thing):
         return self.get_url(suffix, **params)
         
     def get_url_suffix(self):
-        return self.mame or "unnamed"
+        return self.name or "unnamed"
     
     def __repr__(self):
         return "<Author: %s>" % repr(self.key)
@@ -412,6 +545,35 @@ class User(Thing):
             "tags": tags
         }
         return self._site.new(key, doc)
+
+    def is_waiting_for(self, book):
+        """Returns True if this user is waiting to loan given book.
+        """
+        return waitinglist.is_user_waiting_for(self.key, book.key)
+
+    def get_waitinglist(self):
+        """Returns list of records for all the books the user is currently waiting for."""
+        return waitinglist.get_waitinglist_for_user(self.key)
+
+    def has_borrowed(self, book):
+        """Returns True if this user has borrowed given book.
+        """
+        loan = self.get_loan_for(book)
+        return loan is not None
+
+    def get_loan_for(self, book):
+        """Returns the loan object for given book.
+
+        Returns None if this user hasn't borrowed the given book.
+        """
+        from ..plugins.upstream import borrow
+        loans = borrow.get_loans(self)
+        for loan in loans:
+            if book.key == loan['book'] or book.ocaid == loan['ocaid']:
+                return loan
+
+    def get_waiting_loan_for(self, book):
+        return waitinglist.get_waiting_loan_object(self.key, book.key)
 
     def __repr__(self):
         return "<User: %s>" % repr(self.key)
@@ -547,6 +709,10 @@ class Library(Thing):
                 branch.lon = "0"
             return branch
         return [parse(line) for line in self.addresses.splitlines() if line.strip()]
+
+    def get_loans_per_day(self, resource_type="total"):
+        from openlibrary.plugins.openlibrary.libraries import LoanStats
+        return LoanStats().get_loans_per_day(resource_type=resource_type, library=self.key)
         
 class Subject(web.storage):
     def get_lists(self, limit=1000, offset=0, sort=True):
@@ -568,10 +734,12 @@ class Subject(web.storage):
             seed = "subject:" + seed
         return seed
         
-    def url(self, suffix="", **params):
+    def url(self, suffix="", relative=True, **params):
         u = self.key + suffix
         if params:
             u += '?' + urllib.urlencode(params)
+        if not relative:
+            u = _get_ol_base_url() + u
         return u
 
     # get_url is a common method available in all Models. 

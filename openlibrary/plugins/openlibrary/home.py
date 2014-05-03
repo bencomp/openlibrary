@@ -99,6 +99,7 @@ def readonline_carousel(id="read-carousel"):
             data = random.sample(data, 120)
         return render_template("books/carousel", storify(data), id=id)
     except Exception:
+        logger.error("Failed to compute data for readonline_carousel", exc_info=True)
         return None
         
 def random_ebooks(limit=2000):
@@ -116,10 +117,16 @@ def random_ebooks(limit=2000):
             "cover_edition_key",
             "author_key", "author_name",
         ])
-    
+
     def process_doc(doc):
         d = {}
-        d['url'] = "/works/" + doc['key']
+
+        key = doc['key']
+        # New solr stores the key as /works/OLxxxW
+        if not key.startswith("/works/"):
+            key = "/works/" + key
+
+        d['url'] = key
         d['title'] = doc.get('title', '')
         
         if 'author_key' in doc and 'author_name' in doc:
@@ -128,7 +135,7 @@ def random_ebooks(limit=2000):
         if 'cover_edition_key' in doc:
             d['cover_url'] = h.get_coverstore_url() + "/b/olid/%s-M.jpg" % doc['cover_edition_key']
             
-        d['read_url'] = "http://www.archive.org/stream/" + doc['ia'][0]
+        d['read_url'] = "//archive.org/stream/" + doc['ia'][0]
         return d
         
     return [process_doc(doc) for doc in result['docs'] if doc.get('ia')]

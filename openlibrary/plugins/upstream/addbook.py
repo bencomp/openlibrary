@@ -32,11 +32,18 @@ logger = logging.getLogger("openlibrary.book")
 SYSTEM_SUBJECTS = ["Accessible Book", "Lending Library", "In Library", "Protected DAISY"]
 
 def get_works_solr():
-    base_url = "http://%s/solr/works" % config.plugin_worksearch.get('solr')
+    if config.get('single_core_solr'):
+        base_url = "http://%s/solr" % config.plugin_worksearch.get('solr')
+    else:
+        base_url = "http://%s/solr/works" % config.plugin_worksearch.get('solr')
+
     return Solr(base_url)
 
 def get_authors_solr():
-    base_url = "http://%s/solr/authors" % config.plugin_worksearch.get('author_solr')
+    if config.get('single_core_solr'):
+        base_url = "http://%s/solr" % config.plugin_worksearch.get('author_solr')
+    else:
+        base_url = "http://%s/solr/authors" % config.plugin_worksearch.get('author_solr')
     return Solr(base_url)
 
 def make_work(doc):
@@ -581,8 +588,15 @@ class book_edit(delegate.page):
             raise web.notfound()
 
         work = edition.works and edition.works[0]
-        # HACK: create dummy work when work is not available to make edit form work
-        work = work or web.ctx.site.new('', {'key': '', 'type': {'key': '/type/work'}, 'title': edition.title})
+
+        if not work:
+            # HACK: create dummy work when work is not available to make edit form work
+            work = web.ctx.site.new('', {
+                'key': '', 
+                'type': {'key': '/type/work'}, 
+                'title': edition.title,
+                'authors': [{'type': '/type/author_role', 'author': {'key': a['key']}} for a in edition.get('authors', [])]
+            })
 
         recap_plugin_active = 'recaptcha' in config.get('plugins')
 
@@ -767,7 +781,7 @@ class edit(core.edit):
             return core.edit.GET(self, key)
 
 class daisy(delegate.page):
-    path = "(/books/OL\d+M)/daisy"
+    path = "(/books/.*)/daisy"
 
     def GET(self, key):
         page = web.ctx.site.get(key)

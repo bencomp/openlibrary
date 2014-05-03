@@ -21,6 +21,7 @@ from infogami.utils.view import add_flash_message
 import openlibrary
 from openlibrary.core import admin as admin_stats
 from openlibrary.plugins.upstream import forms
+from openlibrary.plugins.upstream.account import send_forgot_password_email
 from openlibrary import accounts
 from openlibrary.core import helpers as h
 
@@ -164,6 +165,8 @@ class people_view:
             return self.POST_resend_link(user)
         elif i.action == "activate_account":
             return self.POST_activate_account(user)
+        elif i.action == "send_password_reset_email":
+            return self.POST_send_password_reset_email(user)
         elif i.action == "block_account":
             return self.POST_block_account(user)
         elif i.action == "unblock_account":
@@ -179,6 +182,10 @@ class people_view:
 
     def POST_activate_account(self, user):
         user.activate()
+        raise web.seeother(web.ctx.path)        
+
+    def POST_send_password_reset_email(self, user):
+        send_forgot_password_email(user.username, user.email)
         raise web.seeother(web.ctx.path)        
 
     def POST_block_account(self, account):
@@ -503,15 +510,20 @@ class inspect:
         return render_template("admin/inspect/store", docs, input=i)
         
     def GET_memcache(self):
-        i = web.input()
+        i = web.input(action="read")
         i.setdefault("keys", "")
         
         from openlibrary.core import cache
         mc = cache.get_memcache()
         
         keys = [k.strip() for k in i["keys"].split() if k.strip()]        
-        mapping = keys and mc.get_multi(keys)
-        return render_template("admin/inspect/memcache", keys, mapping)
+        if i.action == "delete":
+            mc.delete_multi(keys)
+            add_flash_message("info", "Deleted %s keys from memcache" % len(keys))
+            return render_template("admin/inspect/memcache", [], {})
+        else:
+            mapping = keys and mc.get_multi(keys)
+            return render_template("admin/inspect/memcache", keys, mapping)
 
         
 class deploy:
@@ -598,6 +610,17 @@ class permissions:
         add_flash_message("info", "Edit policy has been updated!")
         return self.GET()
 
+class solr:
+    def GET(self):
+        return render_template("admin/solr")
+
+    def POST(self):
+        i = web.input(keys="")
+        keys = i['keys'].strip().split()
+        web.ctx.site.store['solr-force-update'] = dict(type="solr-force-update", keys=keys, _rev=None)
+        add_flash_message("info", "Added the specified keys to solr update queue.!")
+        return self.GET()
+
 def setup():
     register_admin_page('/admin/git-pull', gitpull, label='git-pull')
     register_admin_page('/admin/reload', reload, label='Reload Templates')
@@ -620,6 +643,7 @@ def setup():
     register_admin_page('/admin/deploy', deploy, label="")
     register_admin_page('/admin/graphs', _graphs, label="")
     register_admin_page('/admin/permissions', permissions, label="")
+    register_admin_page('/admin/solr', solr, label="")
 
     inspect_thing.setup()
     support.setup()

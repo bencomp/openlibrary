@@ -95,7 +95,15 @@ class Edition(models.Edition):
         
     def get_cover_url(self, size):
         cover = self.get_cover()
-        return cover and cover.url(size)
+        if cover:
+            return cover.url(size)
+        elif self.ocaid:
+            return self.get_ia_cover(self.ocaid, size)
+
+    def get_ia_cover(self, itemid, size):
+        image_sizes = dict(S=(116, 58), M=(180, 360), L=(500, 500))
+        w, h = image_sizes[size.upper()]
+        return "https://archive.org/download/%s/page/cover_w%s_h%s.jpg" % (itemid, w, h)
 
     def get_identifiers(self):
         """Returns (name, value) pairs of all available identifiers."""
@@ -180,6 +188,9 @@ class Edition(models.Edition):
     def get_current_and_available_loans(self):
         current_loans = borrow.get_edition_loans(self)
         return (current_loans, self._get_available_loans(current_loans))
+
+    def get_current_loans(self):
+        return borrow.get_edition_loans(self)
         
     def get_available_loans(self):
         """
@@ -423,6 +434,15 @@ class Edition(models.Edition):
                 result['author%s' % (i + 1)] = a.name 
         return result
 
+    def is_fake_record(self):
+        """Returns True if this is a record is not a real record from database, 
+        but created on the fly.
+
+        The /books/ia:foo00bar records are not stored in the database, but 
+        created at runtime using the data from archive.org metadata API.
+        """
+        return "/ia:" in self.key
+
 class Author(models.Author):
     def get_photos(self):
         return [Image(self._site, "a", id) for id in self.photos if id > 0]
@@ -457,7 +477,10 @@ class Author(models.Author):
 re_year = re.compile(r'(\d{4})$')
 
 def get_works_solr():
-    base_url = "http://%s/solr/works" % config.plugin_worksearch.get('solr')
+    if config.get("single_core_solr"):
+        base_url = "http://%s/solr" % config.plugin_worksearch.get('solr')
+    else:
+        base_url = "http://%s/solr/works" % config.plugin_worksearch.get('solr')
     return Solr(base_url)
         
 class Work(models.Work):
@@ -485,7 +508,11 @@ class Work(models.Work):
         return []
         
     def _get_solr_data(self):
-        key = self.get_olid()
+        if config.get("single_core_solr"):
+            key = self.key
+        else:
+            key = self.get_olid()
+
         fields = ["cover_edition_key", "cover_id", "edition_key", "first_publish_year"]
         
         solr = get_works_solr()
@@ -537,13 +564,22 @@ class Work(models.Work):
     def get_sorted_editions(self):
         """Return a list of works sorted by publish date"""
         w = self._solr_data
-        editions = w and w.get('edition_key')
+        editions = w and w.get('edition_key') or []
+
+        # solr is stale
+        if len(editions) < self.edition_count:
+            q = {"type": "/type/edition", "works": self.key, "limit": 10000}
+            editions = [k[len("/books/"):] for k in web.ctx.site.things(q)]
         
         if editions:
             return web.ctx.site.get_many(["/books/" + olid for olid in editions])
         else:
             return []
-        
+
+    def has_ebook(self):
+        w = self._solr_data or {}
+        return w.get("has_fulltext", False)
+
     first_publish_year = property(lambda self: self._solr_data.get("first_publish_year"))
         
     def get_edition_covers(self):
@@ -681,21 +717,34 @@ class UnitParser:
 class Changeset(client.Changeset):
     def can_undo(self):
         return False
+
+    def _get_doc(self, key, revision):
+        if revision == 0:
+            return {
+                "key": key,
+                "type": {"key": "/type/delete"}
+            }
+        else:
+            d = web.ctx.site.get(key, revision).dict()
+            if d['type']['key'] == '/type/edition':
+                d.pop('authors', None)
+            return d
+
+    def process_docs_before_undo(self, docs):
+        """Hook to process docs before saving for undo.
+
+        This is called by _undo method to allow subclasses to check
+        for validity or redirects so that undo doesn't fail.
+
+        The subclasses may overwrite this as required.
+        """
+        return docs
         
     def _undo(self):
         """Undo this transaction."""
-        docs = {}
-        
-        def get_doc(key, revision):
-            if revision == 0:
-                return {
-                    "key": key,
-                    "type": {"key": "/type/delete"}
-                }
-            else:
-                return web.ctx.site.get(key, revision).dict()
-        
-        docs = [get_doc(c['key'], c['revision']-1) for c in self.changes]
+        docs = [self._get_doc(c['key'], c['revision']-1) for c in self.changes]
+        docs = self.process_docs_before_undo(docs)
+
         data = {
             "parent_changeset": self.id
         }
@@ -729,6 +778,17 @@ class NewAccountChangeset(Changeset):
 class MergeAuthors(Changeset):
     def can_undo(self):
         return self.get_undo_changeset() is None
+
+    def process_docs_before_undo(self, docs):
+        works = [doc for doc in docs if doc['key'].startswith("/works/")]
+        for w in works:
+            if w.get("authors"):
+                authors = [follow_redirect(web.ctx.site.get(a['author']['key']))
+                            for a in w.get('authors') 
+                            if 'author' in a 
+                            and 'key' in a['author']]
+                w['authors'] = [{"author": {"key": a.key}} for a in authors]
+        return docs        
         
     def get_master(self):
         master = self.data.get("master")

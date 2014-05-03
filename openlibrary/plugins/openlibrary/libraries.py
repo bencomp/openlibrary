@@ -4,6 +4,8 @@ import time
 import logging
 import datetime
 import itertools
+from cStringIO import StringIO
+import csv
 
 import web
 import couchdb
@@ -11,7 +13,7 @@ import couchdb
 from infogami import config
 from infogami.utils import delegate
 from infogami.utils.view import render_template, add_flash_message, public
-from openlibrary.core import inlibrary
+from openlibrary.core import inlibrary, statsdb, geo_ip
 from openlibrary import accounts
 from openlibrary.core.iprange import find_bad_ip_ranges
 
@@ -318,6 +320,34 @@ class stats(delegate.page):
         stats  = LoanStats()
         return render_template("libraries/stats", stats);
 
+class stats_per_library(delegate.page):
+    path = "/libraries/stats/(.*).csv"
+
+    def GET(self, libname):
+        key = "/libraries/" + libname
+        lib = web.ctx.site.get(key)
+        if not lib:
+            raise web.notfound()
+
+        rows = lib.get_loans_per_day("total")        
+
+        dates = [self.to_datestr(row[0]) for row in rows]
+        total = [str(row[1]) for row in rows]
+        pdf = [str(row[1]) for row in lib.get_loans_per_day("pdf")]
+        epub = [str(row[1]) for row in lib.get_loans_per_day("epub")]
+        bookreader = [str(row[1]) for row in lib.get_loans_per_day("bookreader")]
+
+        fileobj = StringIO()
+        writer = csv.writer(fileobj)
+        writer.writerow(["Date", "Total Loans", "PDF Loans", "ePub Loans", "Bookreader Loans"])
+        writer.writerows(zip(dates, total, pdf, epub, bookreader))
+
+        return delegate.RawText(fileobj.getvalue(), content_type="application/csv")
+
+    def to_datestr(self, millis):
+        t = time.gmtime(millis/1000)
+        return "%04d-%02d-%02d" % (t.tm_year, t.tm_mon, t.tm_mday)
+
 @web.memoize
 def get_admin_couchdb():
     db_url = config.get("admin", {}).get("counts_db")
@@ -358,9 +388,11 @@ class LoanStats:
         d['expired_loans'] = sum(count for time, count in freq.items() if int(time) >= 14*24)
         return d
 
-    def get_loans_per_day(self, resource_type="total"):
-        rows = self.view("loans/loans", group=True).rows
-        return [[self.date2timestamp(*row.key)*1000, row.value.get(resource_type, 0)] for row in rows]
+    def get_loans_per_day(self, resource_type="total", library=None):
+        if library is None:
+            library = ""
+        rows = self.view("loans/loans", group=True, startkey=[library], endkey=[library,{}]).rows
+        return [[self.date2timestamp(*row.key[1:])*1000, row.value.get(resource_type, 0)] for row in rows]
 
     def date2timestamp(self, year, month=1, day=1):
         return time.mktime((year, month, day, 0, 0, 0, 0, 0, 0)) # time.mktime takes 9-tuple as argument
@@ -433,7 +465,7 @@ class LoanStats:
 
     def get_loans_per_library(self):
         counts = self._get_lib_counts()
-        return [((lib.key, lib.name), count) for lib, count in counts if not lib.lending_region]
+        return [((lib.key, lib.name), count) for lib, count in counts]
 
     def get_loans_per_state(self):
         counts = self._get_lib_counts()
@@ -487,6 +519,7 @@ def on_loan_created(loan):
 
     library = inlibrary.get_library()
     d['library'] = library and library.key
+    d['geoip_country'] = geo_ip.get_country(web.ctx.ip)
 
     if key in db:
         logger.warn("loan document is already present in the stats database: %r", key)
@@ -533,8 +566,52 @@ def on_loan_completed(loan):
     else:
         logger.warn("loan document missing in the stats database: %r", key)
 
+def on_loan_created_statsdb(loan):
+    """Adds the loan info to the stats database.
+    """
+    key = _get_loan_key(loan)
+    t_start = datetime.datetime.utcfromtimestamp(loan['loaned_at'])
+    d = {
+        "book": loan['book'],
+        "resource_type": loan['resource_type'],
+        "t_start": t_start.isoformat(),
+        "status": "active"
+    }
+    library = inlibrary.get_library()
+    d['library'] = library and library.key
+    d['geoip_country'] = geo_ip.get_country(web.ctx.ip)
+    statsdb.add_entry(key, d)
+
+def on_loan_completed_statsdb(loan):
+    """Marks the loan as completed in the stats database.
+    """
+    key = _get_loan_key(loan)
+    t_start = datetime.datetime.utcfromtimestamp(loan['loaned_at'])
+    t_end = datetime.datetime.utcfromtimestamp(loan['returned_at'])
+    d = {
+        "book": loan['book'],
+        "resource_type": loan['resource_type'],
+        "t_start": t_start.isoformat(),
+        "t_end": t_end.isoformat(),
+        "status": "completed",
+    }
+    old = statsdb.get_entry(key)
+    if old:
+        d = dict(old, **d)
+    statsdb.update_entry(key, d)
+
+def _get_loan_key(loan):
+    # The loan key is now changed from uuid to fixed key.
+    # Using _key as key for loan stats will result in overwriting previous loans.
+    # Using the unique uuid to create the loan key and falling back to _key
+    # when uuid is not available.
+    return "loans/" + loan.get("uuid") or loan["_key"]
+
 def setup():
     from openlibrary.core import msgbroker
 
     msgbroker.subscribe("loan-created", on_loan_created)
     msgbroker.subscribe("loan-completed", on_loan_completed)
+
+    msgbroker.subscribe("loan-created", on_loan_created_statsdb)
+    msgbroker.subscribe("loan-completed", on_loan_completed_statsdb)

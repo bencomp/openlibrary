@@ -10,11 +10,11 @@ var RecaptchaOptions = {
 };
 </script>
 <script type="text/javascript"
-   src="http://www.google.com/recaptcha/api/challenge?k=KEY">
+   src="//www.google.com/recaptcha/api/challenge?k=KEY">
 </script>
 
 <noscript>
-   <iframe src="http://www.google.com/recaptcha/api/noscript?k=KEY"
+   <iframe src="//www.google.com/recaptcha/api/noscript?k=KEY"
        height="300" width="500" frameborder="0"></iframe><br>
    <textarea name="recaptcha_challenge_field" rows="3" cols="40">
    </textarea>
@@ -42,7 +42,7 @@ class Recaptcha(web.form.Input):
             key = self.public_key
         return _recaptcha_html.replace('KEY', key)
 
-    def validate(self):
+    def validate(self, value=None):
         i = web.input(recaptcha_challenge_field="", recaptcha_response_field="")
 
         data = dict(

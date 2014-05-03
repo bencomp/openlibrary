@@ -31,22 +31,6 @@ import processors
 delegate.app.add_processor(processors.ReadableUrlProcessor())
 delegate.app.add_processor(processors.ProfileProcessor())
 
-def setup_invalidation_processor():
-    from openlibrary.core.processors.invalidation import InvalidationProcessor
-    
-    config = infogami.config.get("invalidation", {})
-
-    prefixes = config.get('prefixes', [])
-    timeout = config.get("timeout", 60)
-    cookie_name = config.get("cookie", "invalidation_timestamp")
-    
-    if prefixes:
-        p = InvalidationProcessor(prefixes, timeout=timeout, cookie_name=cookie_name)
-        delegate.app.add_processor(p)
-        client.hooks.append(p.hook)
-
-setup_invalidation_processor()
-
 
 try:
     from infogami.plugins.api import code as api
@@ -69,14 +53,13 @@ from openlibrary.core import models
 models.register_models()
 models.register_types()
 
-# this adds /show-marc/xxx page to infogami
-import showmarc
-
 # Remove movefiles install hook. openlibrary manages its own files.
 infogami._install_hooks = [h for h in infogami._install_hooks if h.__name__ != "movefiles"]
 
 import lists
 lists.setup()
+
+logger = logging.getLogger("openlibrary")
 
 class hooks(client.hook):
     def before_new_version(self, page):
@@ -350,7 +333,7 @@ class change_cover(delegate.mode):
         return render.change_cover(page)
         
 class bookpage(delegate.page):
-    path = r"/(isbn|oclc|lccn|ia|ISBN|OCLC|LCCN|IA)/([^./]*)(/.*)?"
+    path = r"/(isbn|oclc|lccn|ia|ISBN|OCLC|LCCN|IA)/([^/]*)(/.*)?"
 
     def GET(self, key, value, suffix):
         key = key.lower()
@@ -397,12 +380,15 @@ class bookpage(delegate.page):
                 q = {"type": "/type/volume", 'ia_id': value}
                 result = web.ctx.site.things(q)
                 if result:
-                    raise redirect(redirect[0], ext, suffix)
+                    raise redirect(result[0], ext, suffix)
+                else:
+                    raise redirect("/books/ia:" + value, ext, suffix)
             web.ctx.status = "404 Not Found"
             return render.notfound(web.ctx.path, create=False)
         except web.HTTPError:
             raise
         except:
+            logger.error("unexpected error", exc_info=True)
             web.ctx.status = "404 Not Found"
             return render.notfound(web.ctx.path, create=False)
 
@@ -784,15 +770,6 @@ def setup_template_globals():
     })
 
 
-def setup_logging():
-    try:
-        logconfig = infogami.config.get("logging_config_file")
-        if logconfig and os.path.exists(logconfig):
-            logging.config.fileConfig(logconfig, disable_existing_loggers=False)
-    except Exception, e:
-        print >> sys.stderr, "Unable to set logging configuration:", str(e)
-        raise
-
 def setup_context_defaults():
     from infogami.utils import context
     context.defaults.update({
@@ -826,8 +803,5 @@ def setup():
 
     setup_context_defaults()
     setup_template_globals()
-    setup_logging()
-    logger = logging.getLogger("openlibrary")
-    logger.info("Application init")
     
 setup()

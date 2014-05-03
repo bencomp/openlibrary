@@ -91,7 +91,7 @@ ERROR_BAD_IMAGE = 3, "Invalid Image"
 
 class index:
     def GET(self):
-        return '<h1>Open Library Book Covers Repository</h1><div>See <a href="http://openlibrary.org/dev/docs/api/covers">Open Library Covers API</a> for details.</div>'
+        return '<h1>Open Library Book Covers Repository</h1><div>See <a href="https://openlibrary.org/dev/docs/api/covers">Open Library Covers API</a> for details.</div>'
 
 def _cleanup():
     web.ctx.pop("_fieldstorage", None)
@@ -183,7 +183,7 @@ def _locate_item(item):
     """Locates the archive.org item in the cluster and returns the server and directory.
     """
     print >> web.debug, time.asctime(), "_locate_item", item
-    text = urllib.urlopen("http://www.archive.org/metadata/" + item).read()
+    text = urllib.urlopen("https://archive.org/metadata/" + item).read()
     d = simplejson.loads(text)
     return d['server'], d['dir']
 
@@ -201,7 +201,10 @@ def locate_item(item):
 
 def zipview_url(item, zipfile, filename):
     server, dir = locate_item(item)
-    return "http://%(server)s/zipview.php?zip=%(dir)s/%(zipfile)s&file=%(filename)s" % locals()    
+
+    # http or https
+    protocol = web.ctx.protocol
+    return "%(protocol)s://%(server)s/zipview.php?zip=%(dir)s/%(zipfile)s&file=%(filename)s" % locals()
     
 # Number of images stored in one archive.org item
 IMAGES_PER_ITEM = 10000
@@ -218,11 +221,18 @@ class cover:
     def GET(self, category, key, value, size):
         i = web.input(default="true")
         key = key.lower()
+
+        def is_valid_url(url):
+            return url.startswith("http://") or url.startswith("https://")
         
         def notfound():
-            if config.default_image and i.default.lower() != "false" and not i.default.startswith('http://'):
+            if key in ["id", "olid"] and config.get("upstream_base_url"):
+                # this is only used in development
+                base = web.rstrips(config.upstream_base_url, "/")
+                raise web.redirect(base + web.ctx.fullpath)
+            elif config.default_image and i.default.lower() != "false" and not is_valid_url(i.default):
                 return read_file(config.default_image)
-            elif i.default.startswith('http://'):
+            elif is_valid_url(i.default):
                 raise web.seeother(i.default)
             else:
                 raise web.notfound("")
@@ -249,8 +259,17 @@ class cover:
             if value and self.is_cover_in_cluster(value):
                 url = zipview_url_from_id(int(value), size)
                 raise web.found(url)
+        elif key == 'ia':
+            url = self.get_ia_cover_url(value, size)
+            if url:
+                raise web.found(url)
+            else:
+                value = None # notfound or redirect to default. handled later.
         elif key != 'id':
             value = self.query(category, key, value)
+
+        if value and safeint(value) in config.blocked_covers:
+            raise web.notfound()
             
         # redirect to archive.org cluster for large size and original images whenever possible
         if value and (size == "L" or size == "") and self.is_cover_in_cluster(value):
@@ -278,7 +297,22 @@ class cover:
             return read_image(d, size)
         except IOError:
             raise web.notfound()
-            
+
+    def get_ia_cover_url(self, identifier, size="M"):
+        url = "https://archive.org/metadata/%s/metadata" % identifier
+        try:
+            jsontext = urllib.urlopen(url).read()
+            d = simplejson.loads(jsontext).get("result", {})
+        except (IOError, ValueError):
+            return
+
+        # Not a text item or no images or scan is not complete yet
+        if d.get("mediatype") != "texts" or d.get("repub_state", "4") not in ["4", "6"] or "imagecount" not in d:
+            return
+
+        w, h = config.image_sizes[size.upper()]
+        return "https://archive.org/download/%s/page/cover_w%d_h%d.jpg" % (identifier, w, h)
+
     def get_details(self, coverid, size=""):
         try:
             coverid = int(coverid)
@@ -330,7 +364,6 @@ class cover:
         return _query(category, key, value)
         
     ratelimit_query = ratelimit.ratelimit()(query)
-
 
 @web.memoize
 def get_tar_index(tarindex, size):

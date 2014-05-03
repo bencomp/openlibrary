@@ -1,6 +1,6 @@
 # Open Library fastcgi configuration
 
-connection_type: "local"
+connection_type: "hybrid"
 
 site: "openlibrary.org"
 
@@ -46,31 +46,26 @@ state_dir: var/run
 use_gzip: True
 
 admin_password: "admin123"
-errorlog: "var/log/ol-errors"
+errorlog: "/var/log/openlibrary/ol-errors"
 login_cookie_name: session
+
+infobase_server: "localhost:7000"
 
 # contents of this file are assigned to config["infobase"]
 # Path can be relative to this file
 infobase_config_file: infobase.yml
 coverstore_config_file: coverstore.yml
  
-loanstatus_url: http://localhost:8080
+loanstatus_url: http://localhost/
 ia_access_secret: foobar
 
 dev_instance: True
 dev_instance_url: http://127.0.0.1:8080/
 
-plugins:
-    - "openlibrary"
-    - "links"
-    - "search"
-    - "worksearch"
-    - "api"
-    - "books"
-    - "admin"
-    - "upstream"
-    - "importapi"
-    - "theme"
+plugin_modules:
+    - openlibrary
+    - infogami.plugins.links
+    - infogami.plugins.api
 
 plugin_worksearch:
     solr: "localhost:8983"
@@ -81,6 +76,9 @@ plugin_worksearch:
     ebook_count_db_parameters:
         db: 'openlibrary_ebook_count'
         host: 'localhost'
+
+single_core_solr: True
+stats_solr: "localhost:8983"
 
 features:
     upstream: enabled
@@ -177,3 +175,11 @@ libraries_admin_email: admin@dev-instance
 
 graphite_base_url: "http://ol-admin.us.archive.org:7080"
 geoip_database: var/cache/GeoLiteCity.dat
+
+# prefixes ignored for /books/ia:xxx URLs and new-solr-updater.py
+ia_ignore_prefixes:
+    - "jstor-"
+    - "imslp-"
+    - "nasa_techdoc_"
+    - "gov.uscourts."
+    

@@ -6,19 +6,26 @@ from infogami.utils import stats
 import web
 
 def get_works_solr():
-    c = config.get("plugin_worksearch")
-    host = c and c.get('solr')
-    return host and Solr("http://" + host + "/solr/works")
+    if config.get('single_core_solr'):
+        base_url = "http://%s/solr" % config.plugin_worksearch.get('solr')
+    else:
+        base_url = "http://%s/solr/works" % config.plugin_worksearch.get('solr')
 
-def get_author_solr():
-    c = config.get("plugin_worksearch")
-    host = c and c.get('authors_solr')
-    return host and Solr("http://" + host + "/solr/authors")
+    return Solr(base_url)
 
-def get_subject_solr():
-    c = config.get("plugin_worksearch")
-    host = c and c.get('subjects_solr')
-    return host and Solr("http://" + host + "/solr/subjects")
+def get_authors_solr():
+    if config.get('single_core_solr'):
+        base_url = "http://%s/solr" % config.plugin_worksearch.get('author_solr')
+    else:
+        base_url = "http://%s/solr/authors" % config.plugin_worksearch.get('author_solr')
+    return Solr(base_url)
+
+def get_subjects_solr():
+    if config.get('single_core_solr'):
+        base_url = "http://%s/solr" % config.plugin_worksearch.get('subjects_solr')
+    else:
+        base_url = "http://%s/solr/subjects" % config.plugin_worksearch.get('subjects_solr')
+    return Solr(base_url)
 
 def work_search(query, limit=20, offset=0, **kw):
     """Search for works."""
@@ -40,6 +47,9 @@ def work_search(query, limit=20, offset=0, **kw):
         "lending_edition_s",
     ]
     kw.setdefault("fields", fields)
+
+    if config.get('single_core_solr'):
+        kw.setdefault("fq", "type:work")
 
     query = process_work_query(query)
     solr = get_works_solr()
@@ -64,8 +74,12 @@ def process_work_query(query):
     return query
 
 def work_wrapper(w):
+    key = w['key']
+    if not key.startswith("/works/"):
+        key += "/works/"
+
     d = web.storage(
-        key="/works/" + w["key"],
+        key=key,
         title=w["title"],
         edition_count=w["edition_count"]
     )

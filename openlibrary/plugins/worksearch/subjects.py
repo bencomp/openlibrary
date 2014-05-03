@@ -7,6 +7,7 @@ import simplejson as json
 import logging
 from collections import defaultdict
 import urllib
+import datetime
 
 from infogami import config
 from infogami.plugins.api.code import jsonapi
@@ -248,6 +249,12 @@ class SubjectEngine:
             if not w.get('public_scan') and w.ia and w.get('lending_edition'):
                 doc = web.ctx.site.store.get("ebooks/books/" + w['lending_edition']) or {}
                 w['checked_out'] = doc.get("borrowed") == "true"
+
+            # XXX-Anand: Oct 2013
+            # Somewhere something is broken, work keys are coming as OL1234W/works/
+            # Quick fix it solve that issue.
+            if w.key.endswith("/works/"):
+                w.key = "/works/" + w.key.replace("/works/", "")
                 
         subject = Subject(
             key=key,
@@ -270,7 +277,10 @@ class SubjectEngine:
             subject.publishers = result.facets["publisher_facet"]
             subject.languages = result.facets['language']
 
-            subject.publishing_history = [[year, count] for year, count in result.facets["publish_year"] if year > 1000]
+            # Ignore bad dates when computing publishing_history
+            # year < 1000 or year > current_year+1 are considered bad dates
+            current_year = datetime.datetime.utcnow().year
+            subject.publishing_history = [[year, count] for year, count in result.facets["publish_year"] if 1000 < year <= current_year+1]
 
             # strip self from subjects and use that to find exact name
             for i, s in enumerate(subject[meta.key]):

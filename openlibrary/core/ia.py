@@ -4,12 +4,54 @@ import urllib2
 from xml.dom import minidom
 import simplejson
 import web
-
+import logging
 from infogami.utils import stats
-
 import cache
 
-def get_meta_xml(itemid):
+logger = logging.getLogger("openlibrary.ia")
+
+def get_metadata(itemid):
+    itemid = web.safestr(itemid.strip())
+    url = 'http://archive.org/metadata/%s' % itemid
+    try:
+        stats.begin("archive.org", url=url)
+        metadata_json = urllib2.urlopen(url).read()
+        stats.end()
+        d = simplejson.loads(metadata_json)
+        metadata = process_metadata_dict(d.get("metadata", {}))
+
+        # if any of the files is access restricted, consider it as an access-restricted item.
+        files = d.get('files', [])
+        metadata['access-restricted'] = any(f.get("private") == "true" for f in files)
+
+        # remember the filenames to construct download links
+        metadata['_filenames'] = [f['name'] for f in files]
+        return metadata
+    except IOError:
+        stats.end()
+        return {}
+
+get_metadata = cache.memcache_memoize(get_metadata, key_prefix="ia.get_metadata", timeout=5*60)
+
+def process_metadata_dict(metadata):
+    """Process metadata dict to make sure multi-valued fields like
+    collection and external-identifier are always lists.
+
+    The metadata API returns a list only if a field has more than one value
+    in _meta.xml. This puts burden on the application to handle both list and
+    non-list cases. This function makes sure the known multi-valued fields are
+    always lists.
+    """
+    mutlivalued = set(["collection", "external-identifier"])
+    def process_item(k, v):
+        if k in mutlivalued and not isinstance(v, list):
+            v = [v]
+        elif k not in mutlivalued and isinstance(v, list):
+            v = v[0]
+        return (k, v)
+    return dict(process_item(k, v) for k, v in metadata.items() if v)
+
+def _old_get_meta_xml(itemid):
     """Returns the contents of meta_xml as JSON.
     """
     itemid = web.safestr(itemid.strip())
@@ -19,6 +61,7 @@ def get_meta_xml(itemid):
         metaxml = urllib2.urlopen(url).read()
         stats.end()
     except IOError:
+        logger.error("Failed to download _meta.xml for %s", itemid, exc_info=True)
         stats.end()
         return web.storage()
         
@@ -31,11 +74,13 @@ def get_meta_xml(itemid):
         defaults = {"collection": [], "external-identifier": []}
         return web.storage(xml2dict(metaxml, **defaults))
     except Exception, e:
-        print >> web.debug, "Failed to parse metaxml for %s: %s" % (itemid, str(e)) 
+        logger.error("Failed to parse metaxml for %s", itemid, exc_info=True)
         return web.storage()
-        
-get_meta_xml = cache.memcache_memoize(get_meta_xml, key_prefix="ia.get_meta_xml", timeout=5*60)
-        
+
+def get_meta_xml(itemid):
+    # use metadata API instead of parsing meta xml manually
+    return get_metadata(itemid)
+
 def xml2dict(xml, **defaults):
     """Converts xml to python dictionary assuming that the xml is not nested.
     
