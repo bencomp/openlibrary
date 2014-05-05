@@ -19,15 +19,19 @@ def setup():
     for p in old_plugins:
         logger.info("loading plugin %s", p)
         modname = "openlibrary.plugins.%s.code" % p
+        logger.debug("modname: %s" % p)
         path = "openlibrary/plugins/" + p
         template.load_templates(path, lazy=True)
         macro.load_macros(path, lazy=True)
         i18n.load_strings(path)
+        logger.debug("ready to call __import__ on %s" % modname)
         __import__(modname, globals(), locals(), ['plugins'])
 
+    logger.debug("loading views...")
     load_views()
 
     # load actions
+    logger.debug("importing actions...")
     from . import actions
 
     logger.info("loading complete.")

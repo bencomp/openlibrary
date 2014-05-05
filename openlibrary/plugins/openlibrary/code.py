@@ -780,24 +780,37 @@ def setup_context_defaults():
 def setup():
     import home, inlibrary, borrow_home, libraries, stats, support, events, status, merge_editions, authors
     
+    logger.debug("Setting up home...")
     home.setup()
+    logger.debug("Setting up inlibrary...")
     inlibrary.setup()
+    logger.debug("Setting up borrow_home...")
     borrow_home.setup()
+    logger.debug("Setting up libraries...")
     libraries.setup()
+    logger.debug("Setting up stats...")
     stats.setup()
+    logger.debug("Setting up support...")
     support.setup()
+    logger.debug("Setting up events...")
     events.setup()
+    logger.debug("Setting up status...")
     status.setup()
+    logger.debug("Setting up merge_editions...")
     merge_editions.setup()
+    logger.debug("Setting up authors...")
     authors.setup()
     
+    logger.debug("Setting up api...")
     import api
     api.setup()
     
+    logger.debug("Setting up stats_hook...")
     from stats import stats_hook
     delegate.app.add_processor(web.unloadhook(stats_hook))
     
     if infogami.config.get("dev_instance") is True:
+        logger.debug("Setting up dev_instance...")
         import dev_instance
         dev_instance.setup()
 
