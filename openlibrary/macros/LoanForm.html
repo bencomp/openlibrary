@@ -107,36 +107,4 @@ $else:
     .ab-experiment {
         display: none;
     }
-    $if get_ab_value("borrow-layout") == "two-rows":
-        .ab-alt-one-row {
-            display: none;
-        }
-        .ab-alt-two-rows {
-            display: block;
-            text-align: left !important;
-            padding: 0px;
-        }
-        form#borrowbook fieldset {
-            float: none;
-        } 
-        form#borrowbook fieldset.online {
-            width: 455px;
-        }
-        form#borrowbook fieldset.online > div {
-            width: auto;
-            padding: 20px 0px 20px 20px;
-        }
-    $elif get_ab_value("borrow-layout") == "one-row-recommended":
-        .ab-alt-one-row {
-            display: none;
-        }
-        .ab-alt-one-row-recommended {
-            display: block;
-        }
-        form#borrowbook fieldset div {
-            text-align: left;
-        }
-        form#borrowbook fieldset table td {
-            text-align: left;
-        }
 </style>
