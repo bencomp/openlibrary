@@ -480,7 +480,7 @@ def works_by_author(akey, sort='editions', page=1, rows=100):
         'first_publish_year', 'public_scan_b', 'lending_edition_s',
         'overdrive_s', 'ia_collection_s']
     fl = ','.join(fields)
-    solr_select = solr_select_url + "?q.op=AND&q=%s&fq=&start=%d&rows=%d&fl=%s&wt=json" % (q, offset, rows, fl)
+    solr_select = solr_select_url + "?q.op=AND&q=%s&fq=type:work&start=%d&rows=%d&fl=%s&wt=json" % (q, offset, rows, fl)
     facet_fields = ["author_facet", "language", "publish_year", "publisher_facet", "subject_facet", "person_facet", "place_facet", "time_facet"]
     if sort == 'editions':
         solr_select += '&sort=edition_count+desc'
